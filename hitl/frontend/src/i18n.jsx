@@ -56,6 +56,16 @@ const DICT = {
       + "{conf}. Les features ci-dessous ont le plus pesé dans ce verdict, "
       + "selon l'attribution SHAP calculée sur l'ensemble calibré.",
     xai_method: "Méthode", xai_narrative_by: "narration",
+    xai_about: "Nature de l'attaque",
+    xai_interpretation: "Interprétation",
+    xai_checks: "À vérifier avant de décider",
+    xai_reco: "Recommandation consultative",
+    xai_reco_approve: "Approuver la remédiation",
+    xai_reco_verify: "Vérifier avant d'approuver",
+    xai_advisory: "Avis consultatif : la décision reste à l'analyste et "
+      + "sera signée et ancrée on-chain.",
+    xai_agreement: "Accord des détecteurs",
+    xai_evidence: "Preuves : attributions SHAP du flux",
     // ledger
     ledger_entries: "Entrées du registre", consensus_backend: "Backend de consensus",
     chain_integrity: "Intégrité de la chaîne", hash_verified: "chaînage vérifié",
@@ -151,6 +161,16 @@ const DICT = {
       + "{conf}. The features below contributed most to this verdict, "
       + "according to SHAP attributions computed on the calibrated ensemble.",
     xai_method: "Method", xai_narrative_by: "narrative",
+    xai_about: "About this attack",
+    xai_interpretation: "Interpretation",
+    xai_checks: "Verify before deciding",
+    xai_reco: "Advisory recommendation",
+    xai_reco_approve: "Approve the remediation",
+    xai_reco_verify: "Verify before approving",
+    xai_advisory: "Advisory only: the decision stays with the analyst and "
+      + "will be signed and anchored on-chain.",
+    xai_agreement: "Detector agreement",
+    xai_evidence: "Evidence: SHAP attributions for this flow",
     ledger_entries: "Ledger entries", consensus_backend: "Consensus backend",
     chain_integrity: "Chain integrity", hash_verified: "hash chain verified",
     transactions: "Transactions (most recent first)", type: "Type",
@@ -244,6 +264,16 @@ const DICT = {
       + "هي الأكثر مساهمة في هذا الحكم وفق إسنادات SHAP المحسوبة على "
       + "المجموعة المعايَرة.",
     xai_method: "الطريقة", xai_narrative_by: "السرد",
+    xai_about: "طبيعة الهجوم",
+    xai_interpretation: "التفسير",
+    xai_checks: "تحقّق قبل اتخاذ القرار",
+    xai_reco: "توصية استشارية",
+    xai_reco_approve: "الموافقة على الإجراء",
+    xai_reco_verify: "التحقق قبل الموافقة",
+    xai_advisory: "رأي استشاري فقط: القرار يبقى للمحلل وسيُوقَّع ويُثبَّت "
+      + "في السجل.",
+    xai_agreement: "اتفاق الكواشف",
+    xai_evidence: "الأدلة: إسنادات SHAP لهذا التدفق",
     ledger_entries: "إدخالات السجل", consensus_backend: "محرك الإجماع",
     chain_integrity: "سلامة السلسلة", hash_verified: "تم التحقق من سلسلة التجزئة",
     transactions: "المعاملات (الأحدث أولاً)", type: "النوع",

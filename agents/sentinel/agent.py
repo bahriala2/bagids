@@ -244,69 +244,119 @@ class SentinelAgent:
             oldest = self._flow_cache_order.pop(0)
             self._flow_cache.pop(oldest, None)
 
-    #: La narration REFORMULE les attributions SHAP, elle n'explique pas
-    #: d'elle-même : toute feature absente de la liste est interdite.
-    NARRATIVE_SYSTEM = (
-        "You are the explanation layer of an intrusion-detection system. "
-        "You receive the SHAP feature attributions that a calibrated "
-        "neural ensemble computed for one network flow it classified as an "
-        "attack. Rephrase them for a SOC analyst in 2-3 short sentences: "
-        "state the predicted attack class, then explain it ONLY in terms "
-        "of the listed features and their direction (supports = pushed the "
-        "verdict towards this class, opposes = pushed against). You MUST "
-        "NOT mention any feature, value or cause that is not in the list, "
-        "and you MUST NOT invent traffic details. Reply with a single JSON "
-        'object, nothing else: {"en": "...", "fr": "...", "ar": "..."} '
+    #: L'interprétation PARTICULARISE le socle de connaissances avec les
+    #: attributions SHAP du flux : toute feature absente de la liste est
+    #: interdite, et la recommandation reste déterministe (hors LLM).
+    INTERPRET_SYSTEM = (
+        "You are the explanation layer of an intrusion-detection system, "
+        "writing for a SOC analyst who must approve or reject a proposed "
+        "remediation. You receive: the attack class predicted by a "
+        "calibrated neural ensemble, its confidence, the per-detector "
+        "votes, the SHAP feature attributions for this specific flow, and "
+        "a trusted knowledge-base entry about this attack class. Produce:\n"
+        "1. \"interpretation\": 3-4 sentences that (a) say what this attack "
+        "is, (b) explain how the LISTED features and their directions "
+        "match that attack's known network behaviour, concretely (e.g. "
+        "'a very small minimum packet length matches Hulk's flood of tiny "
+        "randomised requests'), and (c) mention the main false-positive "
+        "cause to rule out. Ground every claim in the listed features or "
+        "the knowledge base; NEVER invent traffic details you were not "
+        "given.\n"
+        "2. \"checks\": 3-4 short, concrete verification actions for THIS "
+        "alert (adapt the knowledge-base checklist to the observed "
+        "features).\n"
+        "Reply with a single JSON object, nothing else:\n"
+        '{"interpretation": {"en": "...", "fr": "...", "ar": "..."}, '
+        '"checks": {"en": ["..."], "fr": ["..."], "ar": ["..."]}} '
         "(same content in English, French and Arabic)."
     )
 
-    def _narrate(self, attribution: dict) -> tuple[dict | None, str]:
-        """Traduit les attributions SHAP en texte analyste via le premier
-        backend LLM disponible. Retourne (narrative|None, provider) ;
-        None => le frontend rend un gabarit déterministe localisé."""
+    def _interpret(self, attribution: dict, votes: dict,
+                   agreement: int) -> tuple[dict, str]:
+        """Interprétation + checklist via LLM (ancrées sur SHAP + base de
+        connaissances), avec repli intégral sur le socle déterministe.
+        Retourne (payload, provider). La recommandation est TOUJOURS
+        calculée par la règle déterministe de attack_kb.recommend."""
+        from agents.sentinel.attack_kb import build_fallback, get_kb, recommend
+        n_models = len(votes)
+        fallback = build_fallback(attribution, agreement, n_models)
+        kb = get_kb(attribution["predicted_class"])
+
         feats = "\n".join(
             f"- {t['name']} (normalised value {t['value']:+.3f}): "
             f"SHAP {t['shap']:+.5f} ({t['direction']})"
             for t in attribution["top_features"])
         user = (
             f"Predicted class: {attribution['predicted_class']} "
-            f"(fused confidence {attribution['confidence']:.3f}, "
-            f"base value {attribution['base_value']:.3f})\n"
-            f"Top feature attributions:\n{feats}")
+            f"(fused confidence {attribution['confidence']:.3f})\n"
+            f"Per-detector votes: {votes} "
+            f"(agreement {agreement}/{n_models})\n"
+            f"Top SHAP attributions for this flow:\n{feats}\n\n"
+            f"Knowledge base for this class:\n"
+            f"- What it is: {kb['what']['en']}\n"
+            f"- Typical network signals: {kb['signals']['en']}\n"
+            f"- Known false-positive causes: {kb['fp_notes']['en']}\n"
+            f"- Generic checklist: {kb['checks']['en']}")
+
         for client in self.deliberator.clients:
             try:
-                raw = client.chat(self.NARRATIVE_SYSTEM, user, max_tokens=700)
+                raw = client.chat(self.INTERPRET_SYSTEM, user,
+                                  max_tokens=1600)
                 text = raw.strip().strip("`")
                 if text.startswith("json"):
                     text = text[4:]
                 start, end = text.find("{"), text.rfind("}")
                 data = json.loads(text[start:end + 1])
-                if not all(isinstance(data.get(k), str) and data[k]
+                interp, checks = data["interpretation"], data["checks"]
+                if not all(isinstance(interp.get(k), str) and interp[k]
                            for k in ("en", "fr", "ar")):
-                    raise ValueError("clés en/fr/ar manquantes")
-                return data, f"{client.provider}:{client.model}"
-            except (LLMError, ValueError, json.JSONDecodeError, IndexError) as exc:
-                logger.warning("Narration XAI via %s échouée : %s",
+                    raise ValueError("interpretation en/fr/ar manquante")
+                if not all(isinstance(checks.get(k), list) and checks[k]
+                           for k in ("en", "fr", "ar")):
+                    raise ValueError("checks en/fr/ar manquants")
+                payload = {
+                    "attack_profile": kb["what"],
+                    "interpretation": interp,
+                    "checks": checks,
+                    "recommendation": fallback["recommendation"],
+                }
+                return payload, f"{client.provider}:{client.model}"
+            except (LLMError, ValueError, KeyError, TypeError,
+                    json.JSONDecodeError, IndexError) as exc:
+                logger.warning("Interprétation XAI via %s échouée : %s",
                                client.provider, exc)
-        return None, "template"
+        return fallback, "kb-template"
 
     async def explain_flow(self, flow_id: str, with_narrative: bool) -> dict:
-        """Attributions SHAP (+ narration LLM ancrée) pour un flux alerté.
-        Bloquant ~5-15 s : exécuté dans un thread, appelé uniquement par la
-        couche HITL pour les remédiations en attente d'approbation."""
+        """Explication complète pour l'analyste : attributions SHAP,
+        interprétation métier, checklist de vérification et recommandation
+        consultative. Bloquant ~2-30 s : exécuté dans des threads, appelé
+        uniquement par la couche HITL pour les remédiations en attente."""
+        import numpy as _np
         features = self._flow_cache.get(flow_id)
         if features is None:
             return {"error": "flow_id inconnu ou évincé du cache",
                     "flow_id": flow_id}
         attribution = await asyncio.to_thread(
             self.explainer.explain, features)
-        narrative, provider = (None, "disabled")
-        if with_narrative:
-            narrative, provider = await asyncio.to_thread(
-                self._narrate, attribution)
+
+        # Votes par détecteur (accord = signal de fiabilité pour l'analyste)
+        def _votes():
+            X = _np.asarray(features, dtype=_np.float32).reshape(1, -1)
+            _, calibrated = self.detector.fused_probs(X)
+            return {name: self.detector.class_names[int(p[0].argmax())]
+                    for name, p in calibrated.items()}
+        votes = await asyncio.to_thread(_votes)
+        agreement = sum(1 for v in votes.values()
+                        if v == attribution["predicted_class"])
+
+        analysis, provider = await asyncio.to_thread(
+            self._interpret, attribution, votes, agreement)
         self.explanations_made += 1
-        return {**attribution, "flow_id": flow_id,
-                "narrative": narrative, "narrative_provider": provider,
+        return {**attribution, **analysis, "flow_id": flow_id,
+                "per_model_votes": votes,
+                "agreement": {"agree": agreement, "total": len(votes)},
+                "narrative_provider": provider,
                 "method": f"KernelSHAP(nsamples={attribution['nsamples']}, "
                           f"background={attribution['background_size']})"}
 

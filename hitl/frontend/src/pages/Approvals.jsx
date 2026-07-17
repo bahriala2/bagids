@@ -4,10 +4,14 @@ import { useAuth } from "../auth.jsx";
 import { useI18n } from "../i18n.jsx";
 
 /* ---------------------------------------------------------------- XAI
- * Panneau d'explication d'une remédiation en attente : narration (LLM,
- * ancrée sur les attributions) + barres des features les plus influentes
- * (SHAP). L'explication est calculée hors chemin critique par le Sentinel
- * et attachée à l'élément par le backend quand elle est prête. */
+ * Panneau d'aide à la décision d'une remédiation en attente :
+ *   1. nature de l'attaque (base de connaissances),
+ *   2. interprétation du flux (LLM ancré sur SHAP, ou socle déterministe),
+ *   3. checklist de vérification pour l'analyste,
+ *   4. recommandation consultative (règle déterministe, jamais décisionnelle),
+ *   5. preuves : barres d'attribution SHAP.
+ * Le tout est calculé hors chemin critique par le Sentinel et attaché à
+ * l'élément par le backend quand il est prêt. */
 function ExplanationPanel({ item }) {
   const { t, lang } = useI18n();
   const ex = item.explanation;
@@ -26,19 +30,83 @@ function ExplanationPanel({ item }) {
     );
   }
 
+  const L = (obj) => (obj && (obj[lang] || obj.en)) || null;
   const feats = ex.top_features || [];
   const maxAbs = Math.max(...feats.map((f) => Math.abs(f.shap)), 1e-9);
-  const narrative = ex.narrative && (ex.narrative[lang] || ex.narrative.en);
-  const intro = t("xai_template_intro")
-    .replace("{cls}", ex.predicted_class)
-    .replace("{conf}", `${Math.round((ex.confidence || 0) * 100)}%`);
+  const reco = ex.recommendation;
+  const checks = ex.checks && (ex.checks[lang] || ex.checks.en);
+  const sectionTitle = {
+    fontSize: 12, textTransform: "uppercase", letterSpacing: ".05em",
+    color: "var(--muted)", margin: "12px 0 4px" };
 
   return (
     <div>
-      <p style={{ marginTop: 0 }}>{narrative || intro}</p>
-      <div className="muted" style={{ fontSize: 13, marginBottom: 6 }}>
-        {t("xai_top_features")}
-      </div>
+      {/* 1. nature de l'attaque + accord des détecteurs */}
+      {L(ex.attack_profile) && (
+        <>
+          <div style={{ ...sectionTitle, marginTop: 0 }}>{t("xai_about")}</div>
+          <p style={{ margin: 0 }}>
+            {L(ex.attack_profile)}
+            {ex.agreement && (
+              <span className="muted">
+                {" "}({t("xai_agreement")} : {ex.agreement.agree}/
+                {ex.agreement.total}
+                {ex.per_model_votes &&
+                  " — " + Object.entries(ex.per_model_votes)
+                    .map(([m, c]) => `${m}: ${c}`).join(", ")})
+              </span>
+            )}
+          </p>
+        </>
+      )}
+
+      {/* 2. interprétation du flux */}
+      <div style={sectionTitle}>{t("xai_interpretation")}</div>
+      <p style={{ margin: 0 }}>
+        {L(ex.interpretation)
+          || (ex.narrative && L(ex.narrative))
+          || t("xai_template_intro")
+              .replace("{cls}", ex.predicted_class)
+              .replace("{conf}", `${Math.round((ex.confidence || 0) * 100)}%`)}
+      </p>
+
+      {/* 3. checklist analyste */}
+      {checks && checks.length > 0 && (
+        <>
+          <div style={sectionTitle}>{t("xai_checks")}</div>
+          <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+            {checks.map((c, i) => <li key={i}>{c}</li>)}
+          </ul>
+        </>
+      )}
+
+      {/* 4. recommandation consultative */}
+      {reco && (
+        <>
+          <div style={sectionTitle}>{t("xai_reco")}</div>
+          <div style={{
+            border: "1px solid var(--border)", borderRadius: 8,
+            padding: "8px 12px",
+            borderInlineStartWidth: 4,
+            borderInlineStartColor: reco.verdict === "approve"
+              ? "var(--green)" : "var(--amber)" }}>
+            <strong style={{
+              color: reco.verdict === "approve"
+                ? "var(--green)" : "var(--amber)" }}>
+              {reco.verdict === "approve"
+                ? `✔ ${t("xai_reco_approve")}`
+                : `⚠ ${t("xai_reco_verify")}`}
+            </strong>
+            <p style={{ margin: "4px 0 0" }}>{L(reco.rationale)}</p>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              {t("xai_advisory")}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* 5. preuves : attributions SHAP */}
+      <div style={sectionTitle}>{t("xai_evidence")}</div>
       {feats.map((f) => (
         <div key={f.name} style={{
           display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
@@ -65,9 +133,7 @@ function ExplanationPanel({ item }) {
       ))}
       <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
         {t("xai_method")} : {ex.method}
-        {ex.narrative
-          ? <> · {t("xai_narrative_by")} : {ex.narrative_provider}</>
-          : null}
+        {" · "}{t("xai_narrative_by")} : {ex.narrative_provider}
         {" · "}{(ex.latency_ms / 1000).toFixed(1)} s
       </div>
     </div>
