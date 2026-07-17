@@ -1,0 +1,26 @@
+# ── Cœur détection (étape 1.1) ───────────────────────────────────────
+# TensorFlow 2.15–2.20 (pas 3.13 côté Python). Testé avec 2.19 et 2.20.
+tensorflow>=2.15,<2.21
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3
+scipy>=1.11
+matplotlib>=3.8
+PyYAML>=6.0
+joblib>=1.3
+h5py>=3.10                 # rechargement des modèles Keras legacy (.h5)
+
+# ── Agents autonomes FastAPI (étape 1.2) ─────────────────────────────
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27
+pydantic>=2.6
+
+# ── Consensus signé + console HITL (étapes 1.3 / HITL) ────────────────
+cryptography>=42.0         # identités et signatures Ed25519
+bcrypt>=4.1                # hachage des mots de passe (auth console)
+PyJWT>=2.8                 # jetons de session JWT
+python-multipart>=0.0.9    # formulaire de login (OAuth2PasswordRequestForm)
+
+# ── Optionnel : capture d'écran de la console pour le papier ──────────
+# playwright>=1.44         # puis :  python -m playwright install chromium

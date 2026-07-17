@@ -1,0 +1,93 @@
+# ============================================================
+# BAg-IDS — Étape 1.2 : configuration des agents autonomes
+# ============================================================
+
+# Couche délibérative (LLM). Les deux backends exposent l'API
+# OpenAI /chat/completions ; le premier joignable de provider_order
+# est utilisé, sinon repli sur règles (rules-fallback).
+llm:
+  provider_order: [openrouter, lmstudio]
+  openrouter:
+    base_url: "https://openrouter.ai/api/v1"
+    api_key_env: "OPENROUTER_API_KEY"     # définir la clé dans l'environnement
+    # Essayés dans l'ordre : les modèles :free sont souvent rate-limités
+    # individuellement (429), rarement tous en même temps.
+    models:
+      - "nvidia/nemotron-3-super-120b-a12b:free"
+      - "openai/gpt-oss-120b:free"
+      - "qwen/qwen3-next-80b-a3b-instruct:free"
+      - "meta-llama/llama-3.3-70b-instruct:free"
+    timeout_s: 90
+  lmstudio:
+    base_url: "http://localhost:1234/v1"
+    api_key: "lm-studio"                  # LM Studio ignore la valeur
+    model: "local-model"                  # remplacé par le modèle chargé dans LM Studio
+    timeout_s: 120
+
+sentinel:
+  agent_id: "sentinel-01"
+  host: "127.0.0.1"
+  port: 8001
+  # Bundle de déploiement produit par run_fusion_experiment.py
+  # (--export-bundle) : modèles + scaler + températures + poids + tau.
+  bundle_dir: "results/fusion_experiment/deployment_bundle"
+  # Source des flux : "replay" rejoue le split test CICIDS2017 (V1) ;
+  # "cicflowmeter" (à venir) lira les flux live de l'extracteur.
+  flow_source: "replay"
+  replay:
+    # Flux rejoués depuis le bundle (X_test.npy, y_test.npy)
+    flows_per_second: 60         # mode live : cadence modérée pour le dashboard
+    max_flows: 0                 # tout le split, rejoué en boucle
+    loop: true                  # rejeu continu (surveillance live)
+  # Déclencheurs de la couche délibérative (le LLM ne voit qu'une
+  # fraction des événements : la boucle réflexe filtre)
+  deliberation:
+    on_certified_attack: true          # attaque certifiée (conf >= tau)
+    on_rejection_burst: 50             # N rejets consécutifs => suspicion de dérive
+    min_seconds_between_calls: 10      # anti-rafale : délai minimal entre 2 appels LLM
+  notary_url: "http://127.0.0.1:8002"
+  investigator_url: "http://127.0.0.1:8005"
+
+investigator:
+  agent_id: "investigator-01"
+  host: "127.0.0.1"
+  port: 8005
+  ledger_mirror: "results/agents/ledger.jsonl"
+  signer: "notary-01"
+
+notary:
+  # Consensus multi-notaries (étape 1.3) : la 1re instance est le leader
+  # (reçoit les alertes du Sentinel, collecte les endorsements, détient
+  # le ledger) ; les autres sont des pairs endosseurs indépendants.
+  # À l'étape 1.4, Fabric assure la réplication du ledger entre pairs.
+  instances:
+    - { agent_id: "notary-01", host: "127.0.0.1", port: 8002 }   # leader
+    - { agent_id: "notary-02", host: "127.0.0.1", port: 8012 }
+    - { agent_id: "notary-03", host: "127.0.0.1", port: 8022 }
+  quorum: 2                    # approbations signées requises (2 sur 3)
+  endorsement_timeout_s: 5
+  advisory_enabled: true     # délai max de réponse d'un pair
+  executor_url: "http://127.0.0.1:8003"
+  # Couche Human-in-the-Loop (4e couche) : si renseigné, les remédiations
+  # certifiées passent par la file d'approbation avant exécution. Laisser
+  # vide/absent pour une pleine autonomie sans supervision.
+  hitl_gate_url: "http://127.0.0.1:8090"
+  ledger_path: "results/agents/ledger.jsonl"    # ledger simulé (étape 1.3)
+  keys_dir: "keys"             # identités Ed25519 des agents
+
+executor:
+  agent_id: "executor-01"
+  host: "127.0.0.1"
+  port: 8003
+  # V1 : remédiation simulée (journalisée, aucune action système réelle)
+  dry_run: true
+
+data_scientist:
+  agent_id: "datasci-01"
+  host: "127.0.0.1"
+  port: 8004
+  poll_interval_s: 15                  # période d'observation du Sentinel
+  # Seuils de surveillance de dérive (déclenchent délibération/recalibration)
+  drift:
+    rejection_rate_threshold: 0.25     # taux de rejet glissant
+    window_flows: 2000

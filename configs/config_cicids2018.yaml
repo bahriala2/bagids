@@ -1,0 +1,54 @@
+# ============================================================
+# BAg-IDS — Configuration de l'expérience de fusion calibrée
+# Variante CICIDS2018 (CSE-CIC-IDS2018)
+# ============================================================
+
+data:
+  # 9 des 10 fichiers journaliers officiels CICFlowMeter (tout sauf
+  # Tuesday-20-02-2018 / DDoS-LOIC-HTTP, non nécessaire : ces 9 fichiers
+  # donnent déjà exactement les 14 classes attendues par les modèles).
+  csv_paths:
+    - "data/CICIDS2018/Dataset/Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv"
+    - "data/CICIDS2018/Dataset/Thursday-15-02-2018_TrafficForML_CICFlowMeter.csv"
+    - "data/CICIDS2018/Dataset/Friday-16-02-2018_TrafficForML_CICFlowMeter.csv"
+    - "data/CICIDS2018/Dataset/Wednesday-21-02-2018_TrafficForML_CICFlowMeter.csv"
+    - "data/CICIDS2018/Dataset/Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv"
+    - "data/CICIDS2018/Dataset/Friday-23-02-2018_TrafficForML_CICFlowMeter.csv"
+    - "data/CICIDS2018/Dataset/Wednesday-28-02-2018_TrafficForML_CICFlowMeter.csv"
+    - "data/CICIDS2018/Dataset/Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv"
+    - "data/CICIDS2018/Dataset/Friday-02-03-2018_TrafficForML_CICFlowMeter.csv"
+  label_column: "Label"
+  # Étiquette de la classe bénigne (pour le calcul du FPR) — casse CICIDS2018
+  benign_label: "Benign"
+  scaler_path: null
+  # Colonnes retirées à l'entraînement (cf. notebook CSE-CIC-IDS-2018_models.ipynb,
+  # cellules 12/14 : dataset.drop(['Timestamp']) puis dataset.drop(['Protocol'])
+  # -> 77 features en entrée des modèles, au lieu de 78 sans ce filtrage).
+  drop_columns: ["Timestamp", "Protocol"]
+
+split:
+  train: 0.70
+  val: 0.15
+  test: 0.15
+  seed: 42
+  stratify: true
+
+models:
+  # Les 6 variantes CNN/DNN disponibles (pas de RNN entraîné pour 2018),
+  # chacune évaluée individuellement (per_model_test) et fusionnée ensemble.
+  cnn1: "models/CICIDS2018models/cnn1_cic2018.h5"
+  cnn2: "models/CICIDS2018models/cnn2_cic2018.h5"
+  dnn1: "models/CICIDS2018models/dnn1_cic2018.h5"
+  dnn2: "models/CICIDS2018models/dnn2_cic2018.h5"
+  dnn3: "models/CICIDS2018models/dnn3_cic2018.h5"
+  dnn1_double_downsample: "models/CICIDS2018models/dnn1_cic2018WithDoubleBegingDownshamp.h5"
+
+fusion:
+  tau: 0.70
+  tau_sweep: [0.50, 0.95, 0.05]
+  ece_bins: 15
+
+inference:
+  batch_size: 4096
+
+output_dir: "results/fusion_experiment_cicids2018"

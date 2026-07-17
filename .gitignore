@@ -1,0 +1,27 @@
+# --- Dataset : non distribué (licence CIC/UNB) — voir README pour le lien ---
+data/
+
+# --- Environnements et dépendances ---
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+
+# --- Secrets et clés privées ---
+*.pem
+*.key
+.env
+keys/*_private*
+keys/*.priv
+
+# --- Sorties volumineuses / reconstructibles ---
+*.npy
+results/**/probs*
+hitl/frontend/dist/
+
+# --- Fichiers temporaires ---
+*.tmp
+~$*
+*.log
+.DS_Store
+Thumbs.db

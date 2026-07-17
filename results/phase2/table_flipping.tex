@@ -1,0 +1,17 @@
+% Table — Robustesse au label-flipping du RNN (mesurée, phase 2.3)
+\begin{tabular}{cccccc}
+\toprule
+$p$ & \multicolumn{2}{c}{RNN empoisonné seul} & \multicolumn{2}{c}{Ensemble adaptatif} & Poids RNN \\
+ & Acc. & FPR & Acc. & FPR & (adaptatif) \\
+\midrule
+0.0 & 89.1\% & 1.8\% & 88.2\% & 2.5\% & 0.334 \\
+0.1 & 80.3\% & 11.4\% & 87.2\% & 4.0\% & 0.328 \\
+0.2 & 71.6\% & 21.1\% & 86.4\% & 5.4\% & 0.322 \\
+0.3 & 62.9\% & 30.7\% & 85.6\% & 6.7\% & 0.316 \\
+0.4 & 54.1\% & 40.4\% & 85.0\% & 7.9\% & 0.309 \\
+0.5 & 45.5\% & 50.0\% & 84.4\% & 8.9\% & 0.300 \\
+0.7 & 28.1\% & 69.3\% & 85.7\% & 8.6\% & 0.271 \\
+0.9 & 10.6\% & 88.6\% & 87.1\% & 7.4\% & 0.196 \\
+1.0 & 1.9\% & 98.2\% & 87.2\% & 7.3\% & 0.058 \\
+\bottomrule
+\end{tabular}

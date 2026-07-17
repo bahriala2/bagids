@@ -1,0 +1,37 @@
+{
+  "models": {
+    "rnn": "D:\\these\\projet\\bag-ids\\bag-ids\\models\\SecondModelsWith15Labels\\rnn1.h5",
+    "cnn": "D:\\these\\projet\\bag-ids\\bag-ids\\models\\SecondModelsWith15Labels\\cnn2.h5",
+    "dnn": "D:\\these\\projet\\bag-ids\\bag-ids\\models\\SecondModelsWith15Labels\\dnn1.h5"
+  },
+  "temperatures": {
+    "rnn": 2.881668660867329,
+    "cnn": 4.29708114955296,
+    "dnn": 5.650159267490692
+  },
+  "fusion_weights": {
+    "rnn": 0.33365145131987056,
+    "cnn": 0.3307552544303127,
+    "dnn": 0.33559329424981665
+  },
+  "tau": 0.7,
+  "class_names": [
+    "BENIGN",
+    "Bot",
+    "DDoS",
+    "DoS_GoldenEye",
+    "DoS_Hulk",
+    "DoS_Slowhttptest",
+    "DoS_slowloris",
+    "FTPPatator",
+    "Heartbleed",
+    "Infiltration",
+    "PortScan",
+    "SSHPatator",
+    "Web_AttackBrute_Force",
+    "Web_AttackSql_Injection",
+    "Web_AttackXSS"
+  ],
+  "benign_label": "BENIGN",
+  "n_features": 78
+}

@@ -1,0 +1,49 @@
+# ============================================================
+# BAg-IDS — Configuration de l'expérience de fusion calibrée
+# Étape 1.1 : mesure réelle de l'ensemble RNN+CNN+DNN
+# ============================================================
+
+data:
+  # Chemin(s) vers le(s) CSV CICIDS2017 prétraité(s).
+  # Plusieurs fichiers seront concaténés.
+  csv_paths:
+    - "data/cicids2017_complet/C__Data processing_ISD2017_Dataset_combined8element.csv"
+  # Nom exact de la colonne contenant les étiquettes
+  label_column: "Label"
+  # Étiquette de la classe bénigne (pour le calcul du FPR)
+  benign_label: "BENIGN"
+  # Chemin vers un StandardScaler sauvegardé (joblib) utilisé à l'entraînement.
+  # Mettre null pour re-fitter un scaler sur le split train (voir README, §Attention).
+  scaler_path: null
+  # Colonnes à exclure des features (identifiants, timestamps, etc.)
+  drop_columns: []
+
+split:
+  train: 0.70
+  val: 0.15
+  test: 0.15
+  seed: 42            # même seed que les travaux antérieurs pour la reproductibilité
+  stratify: true
+
+models:
+  # Chemins vers les modèles Keras entraînés (.h5 ou .keras)
+  # Dataset mis à jour = 15 classes (Web Attack réintroduites) -> on utilise
+  # SecondModelsWith15Labels. cnn1.h5 de ce dossier attend un input (9,9,1)
+  # = 81 features (schéma de padding inconnu) et n'est pas utilisé ici ;
+  # cnn2.h5 attend (78,1), cohérent avec les features du dataset.
+  rnn: "models/SecondModelsWith15Labels/rnn1.h5"
+  cnn: "models/SecondModelsWith15Labels/cnn2.h5"
+  dnn: "models/SecondModelsWith15Labels/dnn1.h5"
+
+fusion:
+  # Seuil de confiance de la région de rejet (Eq. 3 du papier)
+  tau: 0.70
+  # Balayage de tau pour l'étude d'ablation : [min, max, pas]
+  tau_sweep: [0.50, 0.95, 0.05]
+  # Nombre de bins pour l'Expected Calibration Error
+  ece_bins: 15
+
+inference:
+  batch_size: 4096
+
+output_dir: "results/fusion_experiment"

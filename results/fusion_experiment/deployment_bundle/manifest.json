@@ -1,0 +1,38 @@
+{
+  "models": {
+    "rnn": "D:\\these\\projet\\bag-ids\\bag-ids\\models\\SecondModelsWith15Labels\\rnn1.h5",
+    "cnn": "D:\\these\\projet\\bag-ids\\bag-ids\\models\\SecondModelsWith15Labels\\cnn2.h5",
+    "dnn": "D:\\these\\projet\\bag-ids\\bag-ids\\models\\SecondModelsWith15Labels\\dnn1.h5"
+  },
+  "temperatures": {
+    "rnn": 1.928804756486658,
+    "cnn": 1.6294202837369882,
+    "dnn": 1.9905077328843042
+  },
+  "fusion_weights": {
+    "rnn": 0.3318114778487186,
+    "cnn": 0.3231665526362668,
+    "dnn": 0.34502196951501446
+  },
+  "tau": 0.7,
+  "class_names": [
+    "BENIGN",
+    "Bot",
+    "DDoS",
+    "DoS_GoldenEye",
+    "DoS_Hulk",
+    "DoS_Slowhttptest",
+    "DoS_slowloris",
+    "FTPPatator",
+    "Heartbleed",
+    "Infiltration",
+    "PortScan",
+    "SSHPatator",
+    "Web_AttackBrute_Force",
+    "Web_AttackSql_Injection",
+    "Web_AttackXSS"
+  ],
+  "benign_label": "BENIGN",
+  "n_features": 78,
+  "preprocessing": "original protocol [AMCAI 2023]: RobustScaler fit on balanced corpus (benign downsampled to 390222, rs=123), split 60/20/20 rs=1"
+}

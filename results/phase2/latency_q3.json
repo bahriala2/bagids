@@ -1,0 +1,73 @@
+{
+  "config": {
+    "n_alerts": 40,
+    "quorum": 3
+  },
+  "runs": [
+    {
+      "backend": "simulated",
+      "quorum": 3,
+      "n_certified": 40,
+      "inference": {
+        "n": 40,
+        "mean_ms": 5.215,
+        "median_ms": 4.768,
+        "p95_ms": 9.061,
+        "p99_ms": 9.061,
+        "min_ms": 4.414,
+        "max_ms": 9.061
+      },
+      "consensus": {
+        "n": 40,
+        "mean_ms": 3.254,
+        "median_ms": 2.843,
+        "p95_ms": 5.025,
+        "p99_ms": 7.246,
+        "min_ms": 2.079,
+        "max_ms": 7.454
+      },
+      "end_to_end": {
+        "n": 40,
+        "mean_ms": 8.468,
+        "median_ms": 8.097,
+        "p95_ms": 13.046,
+        "p99_ms": 15.167,
+        "min_ms": 6.681,
+        "max_ms": 16.514
+      }
+    },
+    {
+      "backend": "fabric",
+      "quorum": 3,
+      "n_certified": 40,
+      "inference": {
+        "n": 40,
+        "mean_ms": 4.228,
+        "median_ms": 4.089,
+        "p95_ms": 4.997,
+        "p99_ms": 4.997,
+        "min_ms": 3.891,
+        "max_ms": 4.997
+      },
+      "consensus": {
+        "n": 40,
+        "mean_ms": 8214.293,
+        "median_ms": 8211.716,
+        "p95_ms": 8229.112,
+        "p99_ms": 8246.222,
+        "min_ms": 8178.967,
+        "max_ms": 8252.472
+      },
+      "end_to_end": {
+        "n": 40,
+        "mean_ms": 8218.521,
+        "median_ms": 8215.69,
+        "p95_ms": 8234.08,
+        "p99_ms": 8250.352,
+        "min_ms": 8183.964,
+        "max_ms": 8256.419
+      }
+    }
+  ],
+  "blockchain_overhead_median_ms": 8208.873
+}
