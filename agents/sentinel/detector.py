@@ -78,6 +78,17 @@ class EnsembleDetector:
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
         return X
 
+    def fused_probs(self, X: np.ndarray) -> np.ndarray:
+        """Posteriors fusionnés (calibration + pool pondéré) pour des flux
+        déjà normalisés. C'est LA fonction de décision de l'ensemble ; elle
+        sert aussi de fonction boîte-noire aux attributions SHAP."""
+        calibrated = {}
+        for name, model in self.models.items():
+            probs = model.predict(reshape_for_model(model, X),
+                                  batch_size=len(X), verbose=0)
+            calibrated[name] = self.temp_scalers[name].transform(probs)
+        return linear_opinion_pool(calibrated, self.weights), calibrated
+
     def detect_batch(self, flows: list[FlowFeatures]) -> list[Detection]:
         """Décide pour un micro-batch de flux déjà normalisés (scaler
         appliqué en amont par la source, comme à l'entraînement)."""
@@ -87,14 +98,7 @@ class EnsembleDetector:
                 f"{X.shape[1]} features reçues, {self.n_features} attendues")
 
         t0 = time.perf_counter()
-        calibrated = {}
-        per_model_argmax = {}
-        for name, model in self.models.items():
-            probs = model.predict(reshape_for_model(model, X),
-                                  batch_size=len(X), verbose=0)
-            calibrated[name] = self.temp_scalers[name].transform(probs)
-            per_model_argmax[name] = calibrated[name]
-        fused = linear_opinion_pool(calibrated, self.weights)
+        fused, per_model_argmax = self.fused_probs(X)
         preds, confs, accepted = decide_with_rejection(fused, self.tau)
         dt_ms = 1000 * (time.perf_counter() - t0)
         per_flow_ms = dt_ms / len(flows)

@@ -45,6 +45,17 @@ const DICT = {
     approve: "Approuver", reject: "Rejeter", read_only: "lecture seule",
     recent_decisions: "Décisions récentes", no_decisions: "Aucune décision.",
     by: "Par", reason: "Motif", cls: "Classe",
+    // approvals — explication XAI
+    why_alert: "Pourquoi ?", xai_title: "Pourquoi cette alerte ? (XAI)",
+    xai_computing: "Explication en cours de calcul (attributions SHAP)…",
+    xai_unavailable: "Explication indisponible pour cette alerte.",
+    xai_failed: "Échec du calcul de l'explication :",
+    xai_top_features: "Features les plus influentes (attribution SHAP)",
+    xai_supports: "pousse vers ce verdict", xai_opposes: "pousse contre",
+    xai_template_intro: "Le flux a été classé {cls} avec une confiance de "
+      + "{conf}. Les features ci-dessous ont le plus pesé dans ce verdict, "
+      + "selon l'attribution SHAP calculée sur l'ensemble calibré.",
+    xai_method: "Méthode", xai_narrative_by: "narration",
     // ledger
     ledger_entries: "Entrées du registre", consensus_backend: "Backend de consensus",
     chain_integrity: "Intégrité de la chaîne", hash_verified: "chaînage vérifié",
@@ -129,6 +140,17 @@ const DICT = {
     approve: "Approve", reject: "Reject", read_only: "read only",
     recent_decisions: "Recent decisions", no_decisions: "No decisions.",
     by: "By", reason: "Reason", cls: "Class",
+    // approvals — XAI explanation
+    why_alert: "Why?", xai_title: "Why this alert? (XAI)",
+    xai_computing: "Computing explanation (SHAP attributions)…",
+    xai_unavailable: "No explanation available for this alert.",
+    xai_failed: "Explanation failed:",
+    xai_top_features: "Most influential features (SHAP attribution)",
+    xai_supports: "pushes towards this verdict", xai_opposes: "pushes against",
+    xai_template_intro: "The flow was classified {cls} with confidence "
+      + "{conf}. The features below contributed most to this verdict, "
+      + "according to SHAP attributions computed on the calibrated ensemble.",
+    xai_method: "Method", xai_narrative_by: "narrative",
     ledger_entries: "Ledger entries", consensus_backend: "Consensus backend",
     chain_integrity: "Chain integrity", hash_verified: "hash chain verified",
     transactions: "Transactions (most recent first)", type: "Type",
@@ -211,6 +233,17 @@ const DICT = {
     approve: "موافقة", reject: "رفض", read_only: "قراءة فقط",
     recent_decisions: "القرارات الأخيرة", no_decisions: "لا قرارات.",
     by: "بواسطة", reason: "السبب", cls: "الفئة",
+    // approvals — شرح XAI
+    why_alert: "لماذا؟", xai_title: "لماذا هذا التنبيه؟ (XAI)",
+    xai_computing: "جارٍ حساب الشرح (إسنادات SHAP)…",
+    xai_unavailable: "لا يتوفر شرح لهذا التنبيه.",
+    xai_failed: "فشل حساب الشرح:",
+    xai_top_features: "أكثر الخصائص تأثيرًا (إسناد SHAP)",
+    xai_supports: "يدفع نحو هذا الحكم", xai_opposes: "يدفع ضدّه",
+    xai_template_intro: "صُنِّف التدفق كـ {cls} بثقة {conf}. الخصائص أدناه "
+      + "هي الأكثر مساهمة في هذا الحكم وفق إسنادات SHAP المحسوبة على "
+      + "المجموعة المعايَرة.",
+    xai_method: "الطريقة", xai_narrative_by: "السرد",
     ledger_entries: "إدخالات السجل", consensus_backend: "محرك الإجماع",
     chain_integrity: "سلامة السلسلة", hash_verified: "تم التحقق من سلسلة التجزئة",
     transactions: "المعاملات (الأحدث أولاً)", type: "النوع",

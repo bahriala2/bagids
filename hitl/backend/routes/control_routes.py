@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
 
 from hitl.backend.auth import require_role
@@ -51,6 +51,9 @@ class ApprovalRequest(BaseModel):
     rationale: str | None = None
     # Objets d'action complets, transmis à l'Executor après approbation.
     action_objects: list[dict] = []
+    # Identifiant du flux à l'origine de l'alerte : permet de demander au
+    # Sentinel l'explication XAI (SHAP) présentée à l'analyste.
+    flow_id: str | None = None
 
 
 # ------------------------------------------------ file d'approbation
@@ -96,7 +99,7 @@ def _forward_to_executor(action_objects: list[dict]) -> list[str]:
 
 
 @router.post("/agent/request-approval")
-def request_approval(req: ApprovalRequest):
+def request_approval(req: ApprovalRequest, background_tasks: BackgroundTasks):
     """Endpoint appelé par les agents (pas d'auth : réseau interne).
     Place la remédiation en file si HITL l'exige ; sinon auto-approuve."""
     if not STATE.requires_approval(req.severity):
@@ -104,6 +107,7 @@ def request_approval(req: ApprovalRequest):
     item = {
         "id": uuid.uuid4().hex,
         "alert_id": req.alert_id,
+        "flow_id": req.flow_id,
         "predicted_class": req.predicted_class,
         "severity": req.severity,
         "confidence": req.confidence,
@@ -112,9 +116,33 @@ def request_approval(req: ApprovalRequest):
         "action_objects": req.action_objects,
         "created_at": time.time(),
         "status": "pending",
+        # Explication XAI : null = calcul en cours (ou indisponible) ;
+        # renseignée de façon asynchrone par _fetch_explanation.
+        "explanation": None,
     }
     STATE.enqueue(item)
+    # L'explication (SHAP + narration LLM, ~5-30 s) est demandée au
+    # Sentinel HORS de la requête du Notary, qui doit répondre en <5 s.
+    if req.flow_id:
+        background_tasks.add_task(_fetch_explanation, item["id"], req.flow_id)
     return {"auto_approved": False, "queued": True, "id": item["id"]}
+
+
+def _fetch_explanation(item_id: str, flow_id: str):
+    """Tâche de fond : demande l'explication au Sentinel et l'attache à
+    l'élément en attente (sans jamais bloquer la file d'approbation)."""
+    import httpx
+    from hitl.backend.config import CONFIG
+    url = f"{CONFIG['agents']['sentinel']}/explain"
+    try:
+        with httpx.Client(timeout=120.0) as http:
+            r = http.post(url, json={"flow_id": flow_id,
+                                     "with_narrative": True})
+            r.raise_for_status()
+            data = r.json()
+    except httpx.HTTPError as exc:
+        data = {"error": f"sentinel injoignable : {exc}"}
+    STATE.attach_explanation(item_id, data)
 
 
 # ------------------------------------------------------ gouvernance

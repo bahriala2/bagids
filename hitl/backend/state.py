@@ -65,6 +65,20 @@ class HITLState:
                         f"Remédiation en attente d'approbation : "
                         f"{item.get('predicted_class')} ({item.get('severity')})")
 
+    def attach_explanation(self, item_id: str, explanation: dict):
+        """Attache le résultat XAI (SHAP + narration) à une remédiation
+        encore en attente. Si l'analyste a déjà tranché, l'explication est
+        jointe à la décision historisée (utile pour l'audit a posteriori)."""
+        with self._lock:
+            item = self._pending.get(item_id)
+            if item is not None:
+                item["explanation"] = explanation
+                return
+            for decided in self._decisions:
+                if decided.get("id") == item_id:
+                    decided["explanation"] = explanation
+                    return
+
     def pending(self) -> list[dict]:
         with self._lock:
             return sorted(self._pending.values(),

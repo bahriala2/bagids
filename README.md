@@ -120,6 +120,15 @@ load the three models, then watch: 5/5 agents online, live verdicts, agentic
 investigation traces (Investigations tab), quorum votes (Incidents tab),
 signed governance actions (Governance tab, admin).
 
+In the **Approvals** tab, every remediation awaiting human approval carries a
+**"Why?" (XAI) panel**: KernelSHAP feature attributions computed by the
+Sentinel on the fused calibrated ensemble, rendered as per-feature
+contribution bars, plus an analyst-readable narrative strictly grounded on
+those attributions (LLM when available, deterministic template otherwise).
+Explanations are computed off the critical path, only for queued
+remediations — the same asymmetric-cost principle as deliberation and
+consensus.
+
 ---
 
 ## 4. Reproducing the paper's results

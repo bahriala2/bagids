@@ -24,3 +24,6 @@ python-multipart>=0.0.9    # formulaire de login (OAuth2PasswordRequestForm)
 
 # ── Optionnel : capture d'écran de la console pour le papier ──────────
 # playwright>=1.44         # puis :  python -m playwright install chromium
+
+# ── XAI : explication des alertes en file d'approbation (couche HITL) ─
+shap>=0.46

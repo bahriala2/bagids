@@ -268,6 +268,9 @@ class NotaryAgent:
             return False  # couche HITL non configurée : pleine autonomie
         payload = {
             "alert_id": alert.alert_id,
+            # flow_id : permet à la couche HITL de demander au Sentinel
+            # l'explication XAI (SHAP) du flux à l'origine de la remédiation.
+            "flow_id": alert.detection.flow_id,
             "predicted_class": alert.detection.predicted_class,
             "severity": alert.severity.value,
             "confidence": alert.detection.confidence,

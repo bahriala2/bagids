@@ -42,7 +42,9 @@ for _stream in (sys.stdout, sys.stderr):
     if hasattr(_stream, "reconfigure"):
         _stream.reconfigure(encoding="utf-8", errors="replace")
 
-from agents.common.llm_client import Deliberator, build_clients
+import json
+
+from agents.common.llm_client import Deliberator, LLMError, build_clients
 from agents.common.schemas import (
     Alert,
     AlertSeverity,
@@ -53,6 +55,7 @@ from agents.common.schemas import (
     Verdict,
 )
 from agents.sentinel.detector import EnsembleDetector
+from agents.sentinel.explainer import FlowExplainer
 from agents.sentinel.flow_source import ReplayFlowSource
 
 logging.basicConfig(
@@ -66,6 +69,12 @@ class InjectBody(BaseModel):
     flows: list[list[float]]
     labels: list[str] | None = None
     raw: bool = True
+
+
+class ExplainBody(BaseModel):
+    """Demande d'explication XAI pour un flux déjà classé (par flow_id)."""
+    flow_id: str
+    with_narrative: bool = True
 logger = logging.getLogger("bag_ids.agents.sentinel")
 
 
@@ -77,6 +86,11 @@ class SentinelAgent:
 
         self.detector = EnsembleDetector(self.cfg["bundle_dir"])
         self.deliberator = Deliberator(build_clients(cfg["llm"]))
+        # XAI : attributions SHAP servies à la demande (file d'approbation
+        # HITL uniquement — hors chemin critique par construction).
+        self.explainer = FlowExplainer(self.detector, self.cfg["bundle_dir"],
+                                       self.cfg.get("explain"))
+        self.explanations_made = 0
 
         # État interne (autonomie : l'agent tient ses propres compteurs)
         self.processed = 0
@@ -86,6 +100,14 @@ class SentinelAgent:
         self._consecutive_rejections = 0
         self._last_deliberation_ts = 0.0
         self._stop = asyncio.Event()
+        # Cache des vecteurs de features des flux non bénins récents :
+        # nécessaire pour expliquer a posteriori une alerte mise en file
+        # d'approbation (le flow_id seul circule dans les alertes).
+        self._flow_cache: dict[str, list[float]] = {}
+        self._flow_cache_order: list[str] = []
+        self._flow_cache_max = int(self.cfg.get("explain", {}).get(
+            "cache_size", 4096) if isinstance(self.cfg.get("explain"), dict)
+            else 4096)
 
     # ------------------------------------------------------------ boucle
     async def run(self):
@@ -104,7 +126,8 @@ class SentinelAgent:
                     break
                 detections = self.detector.detect_batch(batch)
                 self.processed += len(detections)
-                for det in detections:
+                for flow, det in zip(batch, detections):
+                    self._cache_flow(flow, det)
                     await self._handle_detection(det, http)
         logger.info(
             "[%s] Boucle terminée : %d flux, verdicts=%s, alertes=%d, "
@@ -131,7 +154,8 @@ class SentinelAgent:
         self.processed += len(detections)
         out = []
         async with httpx.AsyncClient(timeout=10.0) as http:
-            for det in detections:
+            for flow, det in zip(flows, detections):
+                self._cache_flow(flow, det)
                 await self._handle_detection(det, http)
                 out.append({
                     "flow_id": det.flow_id,
@@ -207,6 +231,85 @@ class SentinelAgent:
         ]
         return "\n".join(lines)
 
+    # ------------------------------------------------------- XAI (HITL)
+    def _cache_flow(self, flow: FlowFeatures, det: Detection):
+        """Mémorise le vecteur de features des flux NON bénins récents,
+        pour pouvoir expliquer a posteriori une remédiation mise en file
+        d'approbation. Éviction FIFO au-delà de `explain.cache_size`."""
+        if det.verdict is Verdict.BENIGN or det.flow_id in self._flow_cache:
+            return
+        self._flow_cache[det.flow_id] = list(flow.features)
+        self._flow_cache_order.append(det.flow_id)
+        if len(self._flow_cache_order) > self._flow_cache_max:
+            oldest = self._flow_cache_order.pop(0)
+            self._flow_cache.pop(oldest, None)
+
+    #: La narration REFORMULE les attributions SHAP, elle n'explique pas
+    #: d'elle-même : toute feature absente de la liste est interdite.
+    NARRATIVE_SYSTEM = (
+        "You are the explanation layer of an intrusion-detection system. "
+        "You receive the SHAP feature attributions that a calibrated "
+        "neural ensemble computed for one network flow it classified as an "
+        "attack. Rephrase them for a SOC analyst in 2-3 short sentences: "
+        "state the predicted attack class, then explain it ONLY in terms "
+        "of the listed features and their direction (supports = pushed the "
+        "verdict towards this class, opposes = pushed against). You MUST "
+        "NOT mention any feature, value or cause that is not in the list, "
+        "and you MUST NOT invent traffic details. Reply with a single JSON "
+        'object, nothing else: {"en": "...", "fr": "...", "ar": "..."} '
+        "(same content in English, French and Arabic)."
+    )
+
+    def _narrate(self, attribution: dict) -> tuple[dict | None, str]:
+        """Traduit les attributions SHAP en texte analyste via le premier
+        backend LLM disponible. Retourne (narrative|None, provider) ;
+        None => le frontend rend un gabarit déterministe localisé."""
+        feats = "\n".join(
+            f"- {t['name']} (normalised value {t['value']:+.3f}): "
+            f"SHAP {t['shap']:+.5f} ({t['direction']})"
+            for t in attribution["top_features"])
+        user = (
+            f"Predicted class: {attribution['predicted_class']} "
+            f"(fused confidence {attribution['confidence']:.3f}, "
+            f"base value {attribution['base_value']:.3f})\n"
+            f"Top feature attributions:\n{feats}")
+        for client in self.deliberator.clients:
+            try:
+                raw = client.chat(self.NARRATIVE_SYSTEM, user, max_tokens=700)
+                text = raw.strip().strip("`")
+                if text.startswith("json"):
+                    text = text[4:]
+                start, end = text.find("{"), text.rfind("}")
+                data = json.loads(text[start:end + 1])
+                if not all(isinstance(data.get(k), str) and data[k]
+                           for k in ("en", "fr", "ar")):
+                    raise ValueError("clés en/fr/ar manquantes")
+                return data, f"{client.provider}:{client.model}"
+            except (LLMError, ValueError, json.JSONDecodeError, IndexError) as exc:
+                logger.warning("Narration XAI via %s échouée : %s",
+                               client.provider, exc)
+        return None, "template"
+
+    async def explain_flow(self, flow_id: str, with_narrative: bool) -> dict:
+        """Attributions SHAP (+ narration LLM ancrée) pour un flux alerté.
+        Bloquant ~5-15 s : exécuté dans un thread, appelé uniquement par la
+        couche HITL pour les remédiations en attente d'approbation."""
+        features = self._flow_cache.get(flow_id)
+        if features is None:
+            return {"error": "flow_id inconnu ou évincé du cache",
+                    "flow_id": flow_id}
+        attribution = await asyncio.to_thread(
+            self.explainer.explain, features)
+        narrative, provider = (None, "disabled")
+        if with_narrative:
+            narrative, provider = await asyncio.to_thread(
+                self._narrate, attribution)
+        self.explanations_made += 1
+        return {**attribution, "flow_id": flow_id,
+                "narrative": narrative, "narrative_provider": provider,
+                "method": f"KernelSHAP(nsamples={attribution['nsamples']}, "
+                          f"background={attribution['background_size']})"}
+
     # ------------------------------------------------------------ alerte
     async def _send_alert(self, det: Detection,
                           deliberation: DeliberationResult | None,
@@ -247,6 +350,7 @@ class SentinelAgent:
                 **{f"verdict_{k}": v for k, v in self.counts.items()},
                 "alerts_sent": self.alerts_sent,
                 "deliberations": self.deliberations,
+                "explanations": self.explanations_made,
             },
         )
 
@@ -271,6 +375,16 @@ def build_app(agent: SentinelAgent) -> FastAPI:
         except ValueError as exc:
             return {"error": str(exc)}
         return {"n": len(results), "results": results}
+
+    @app.post("/explain")
+    async def explain(body: ExplainBody):
+        """Explication XAI (SHAP + narration) d'un flux alerté — appelé par
+        la couche HITL pour les remédiations en attente d'approbation."""
+        try:
+            return await agent.explain_flow(body.flow_id, body.with_narrative)
+        except Exception as exc:  # jamais fatal pour l'agent
+            logger.exception("Explication XAI échouée pour %s", body.flow_id)
+            return {"error": str(exc), "flow_id": body.flow_id}
 
     @app.get("/meta")
     def meta():

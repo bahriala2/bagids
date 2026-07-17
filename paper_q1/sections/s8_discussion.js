@@ -203,7 +203,13 @@ module.exports = ({ h1, h2, h3, p, r, b, i, eq, li, caption, table, fig }) => [
     + "poisoning defence into an adaptive one. Finally, the human-in-the-loop "
     + "layer opens a line of work on usable, accountable autonomy: how much "
     + "oversight operators actually exercise, and how the on-chain governance "
-    + "record supports post-incident review and compliance."),
+    + "record supports post-incident review and compliance. A natural "
+    + "extension of that layer is faithful explainability at the approval "
+    + "surface: because remediations awaiting human approval are rare by "
+    + "construction, per-decision feature attributions (for example "
+    + "model-agnostic Shapley-value estimates over the fused ensemble) can "
+    + "be afforded exactly where an analyst must decide, following the same "
+    + "asymmetric-cost principle as deliberation and consensus."),
   ]),
 
   p([
